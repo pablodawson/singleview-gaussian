@@ -9,6 +9,7 @@ from depth_predictor import DepthAnythingMetric
 #from marigold_depth import MarigoldDepth
 import torch
 
+
 def depth_to_saveable( depth):
     return np.clip((depth * (2**13 - 1)),0, 2**16-1).astype(np.uint16)
 
@@ -23,7 +24,7 @@ def main():
     #estimator = MarigoldDepth()
     estimator = DepthAnythingMetric()
 
-    args.image_path = "input/0001.png"
+    args.image_path = "input/scale.jpg"
     os.makedirs(args.output_path, exist_ok=True)
     
     # Create cameras

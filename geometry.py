@@ -18,7 +18,7 @@ def depth_edges_mask(depth):
     # Compute the gradient magnitude.
     depth_grad = np.sqrt(depth_dx ** 2 + depth_dy ** 2)
     # Compute the edge mask.
-    mask = depth_grad > 0.3
+    mask = depth_grad > 0.15
     return mask
 
 def create_triangles(h, w, mask=None):

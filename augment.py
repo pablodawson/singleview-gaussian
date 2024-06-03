@@ -67,10 +67,7 @@ class DataAugmentor:
                         [0, 0, 1]])
         
         # Get foreground mask, inpaint to get background
-        #dispL = 1.0 / (depth_init + 1e-6)
-        #dispL = (dispL - np.percentile(dispL,10)) / (np.percentile(dispL,90) - np.percentile(dispL,10))
         color_img = image_init.resize(self.size)
-        #disp_img = (cv2.resize(dispL, self.size) * 255).astype(np.uint8)
 
         bg = remove(image_init)
         bg = np.array(bg)
@@ -142,12 +139,12 @@ class DataAugmentor:
             foreground_color, foreground_depth = self.renderer.render(self.scene, flags= self.flags)
             self.scene.add_node(B_mesh_node)
 
-            cv2.imwrite(f"{i}.png", color)
-            Image.fromarray(self.depth_to_saveable(depth)).save(f"{i}_depth.png")
-            cv2.imwrite(f"{i}_foreground.png", foreground_color)
-            cv2.imwrite(f"{i}_foreground_depth.png", foreground_depth)
+            cv2.imwrite(f"debug/{i}.png", color)
+            Image.fromarray(self.depth_to_saveable(depth)).save(f"debug/{i}_depth.png")
+            cv2.imwrite(f"debug/{i}_foreground.png", foreground_color)
+            cv2.imwrite(f"debug/{i}_foreground_depth.png", self.depth_to_saveable(foreground_depth))
             
-            # Create mask
+            # Create masks
 
             # Holes in the main image
             mask_init = cv2.inRange(color, (255,255,255), (255,255,255))
@@ -156,10 +153,10 @@ class DataAugmentor:
             # Foreground expansion
             foreground_inv = cv2.inRange(foreground_color, (255,255,255), (255,255,255))
             foreground = 255 - foreground_inv
-            foreground_expanded = cv2.dilate(foreground, np.ones((5,5), np.uint8), iterations=4)
-
+            foreground_expanded = cv2.dilate(foreground, np.ones((3,3), np.uint8))
+            
             expansion = cv2.bitwise_and(foreground_expanded, foreground_inv)
-            expansion = cv2.dilate(expansion, np.ones((5,5), np.uint8))
+            expansion = cv2.dilate(expansion, np.ones((3,3), np.uint8))
 
             # Blend the two
             mask = cv2.bitwise_or(expansion, mask_init).copy()
@@ -192,16 +189,19 @@ class DataAugmentor:
             self.points = np.concatenate((self.points, points), axis=0)
             self.colors = np.concatenate((self.colors, colors), axis=0)
             
-            # Add mesh
-            # Needs in relation to the init position ? 
-            reconstruction = get_mesh(color, depth_fill, K=K, mask=mask)
+            # Add background holes mesh
+            reconstruction = get_mesh(color, depth_fill, K=K, mask=mask_init)
             mesh = pyrender.Mesh.from_trimesh(reconstruction)
             Aug_mesh_node = pyrender.Node(mesh=mesh, matrix=campose)
-            self.scene.add_node(Aug_mesh_node)
+            self.scene.add_node(Aug_mesh_node, parent_node=B_mesh_node)
+
+            # Add foreground expansion mesh
+            reconstruction = get_mesh(color, depth_fill, K=K, mask=expansion)
+            mesh = pyrender.Mesh.from_trimesh(reconstruction)
+            Aug_mesh_node_f = pyrender.Node(mesh=mesh, matrix=campose)
+            self.scene.add_node(Aug_mesh_node_f, parent_node=F_mesh_node)
 
             # Render with augmented mesh
             color, depth = self.renderer.render(self.scene, flags= self.flags)
-            cv2.imwrite(f"{i}_aug_newmesh.png", color)
-            Image.fromarray(self.depth_to_saveable(depth)).save(f"{i}_aug_newmesh_depth.png")
-
-            
+            cv2.imwrite(f"debug/{i}_aug_newmesh.png", color)
+            Image.fromarray(self.depth_to_saveable(depth)).save(f"debug/{i}_aug_newmesh_depth.png")

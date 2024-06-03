@@ -4,6 +4,7 @@ import glob
 from pre_colmap import COLMAPDatabase
 from geometry_utils import rotmat2qvec
 import shutil
+from scipy.spatial.transform import Rotation as R
 
 def create_colmap_dataset(path, points3d, colors, cameras, offset=0, frame="0001.png"):
     
@@ -25,9 +26,10 @@ def create_colmap_dataset(path, points3d, colors, cameras, offset=0, frame="0001
     db = COLMAPDatabase.connect(os.path.join(projectfolder, "input.db"))
     
     db.create_tables()
+    
+    # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
 
-    points3d[:,0] *= -1
-    #points3d[:,1] *= -1
+    points3d *= -1
 
     # Add points
     pointtxtlist.append("# 3D point list with one line of data per point:\n")
@@ -46,14 +48,18 @@ def create_colmap_dataset(path, points3d, colors, cameras, offset=0, frame="0001
     
     for i in range(len(w2c_matriclist)):
         cameraname = os.path.basename("cam" + str(i).zfill(2))
-        m = w2c_matriclist[i]
+        m =w2c_matriclist[i]
         
         # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
         m[:3, 1:3] *= -1
-
-        colmapR = m[:3, :3]
         T = m[:3, 3]
         T[0] = -T[0]
+        colmapR = m[:3, :3]
+        rot = R.from_euler('xyz', [0, 180,180], degrees=True).as_quat()
+        colmapR = np.linalg.inv(np.dot(R.from_quat(rot).as_matrix(), colmapR))
+        
+        #T[2] = -T[2]
+        #T[1] = -T[1]
         
         H = cameras.res
         W = cameras.res
